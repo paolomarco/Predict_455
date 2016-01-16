@@ -1,0 +1,116 @@
+---
+title: "Assigment_1"
+output: word_document
+---
+
+_Scatter plot with a line vs. lowess curve vs. point bubbles using mtcars dataset_
+
+The variables used are weight (wt) and miles per gallon (mpg)
+```{r}
+require(ggplot2)
+data("mtcars")
+head(mtcars)
+x_var<-mtcars$wt
+y_var<-mtcars$mpg
+plot1<-ggplot(mtcars, aes(x=x_var,y=y_var))
+plot1<-plot1 + geom_point(colour='grey50',size=4)
+plot1<-plot1 + stat_smooth(method = "loess")
+plot1<-plot1 + geom_hline(yintercept=mean(y_var))
+plot1<-plot1 + labs(title="MPG by Weight") + xlab("Weight") + ylab("MPG")
+plot1
+```
+
+_EDA and Multivariate plots_
+The dataset being used is the iris dataset. 
+
+```{r}
+data("iris")
+panel.cor <- function(x, y, digits=2, prefix="", cex.cor, ...)
+{
+        usr <- par("usr"); on.exit(par(usr))
+        par(usr = c(0, 1, 0, 1))
+        r <- abs(cor(x, y))
+        txt <- format(c(r, 0.123456789), digits=digits)[1]
+        txt <- paste(prefix, txt, sep="")
+        if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+        text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+# Plot #2: same as above, but add loess smoother in lower and correlation in upper
+pairs(~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris,
+      lower.panel=panel.smooth, upper.panel=panel.cor, 
+      pch=20, main="Iris Scatterplot Matrix")
+```
+
+_Pareto chart for ranking items_
+
+The dataset being used is titled "Leading Causes of Death by ZIP Code 1999-2013" for California and is available at data.gov. We are generating a pareto chart displaying
+the leading causes of death. The dataset is large so it may take a while for it to load into R.
+
+```{r}
+library(RCurl)
+require(qcc)
+x <- getURL("https://raw.githubusercontent.com/paolomarco/Predict_455/master/Leading_Causes_of_Death_by_ZIP_Code__1999-2013.csv")
+deaths<-read.csv(text=x,header = TRUE,sep = ',')
+unlink(temp)
+causes<-unique(deaths$Causes.of.Death)
+totals<-vector()
+for (i in causes){
+        cause<-subset(deaths,deaths$Causes.of.Death==i)
+        totals[i]<-sum(cause$Count)
+}
+pareto.chart(totals)
+```
+
+_Main Graph Vs. Segmented Graphs using the airquality dataset_
+
+```{r}
+data("airquality")
+head(airquality)
+require(lattice)
+
+#create factors
+month_f<-factor(airquality$Month,levels=unique(airquality$Month),labels=c('May','June','July','August','September'))
+#create paneled plot of ozone and solar.R by month
+xyplot(Ozone~Solar.R|month_f,data=airquality)
+```
+
+_Ranking of variables on the basis of correlation or other variable importance measures_
+
+This data set is from data.gov and is called "Community Health Status Indicators (CHSI) to Combat Obesity, Heart Disease and Cancer"
+
+The goal is to look at some health risk factor variables to see how they are correlated with the rate of people aged between 65 and 84. The data comes from two different csv files titled DEMOGRAPHICS.csv and RiskFactorsAndAccessToCare.csv respectively. Both are available at data.gov.
+
+```{r}
+temp <- tempfile()
+download.file("ftp://ftp.cdc.gov/pub/Health_Statistics/NCHS/Datasets/CHDI/chsi_dataset.zip",temp)
+age_65_84<-read.csv(unz(temp,"DEMOGRAPHICS.csv"),sep = ',',na.strings = '-1111.1')[,c('Age_65_84')]
+
+risk_factors<-read.csv(unz(temp,'RiskFactorsAndAccessToCare.csv'),sep = ',',na.strings = '-1111.1')[,c('CHSI_County_Name','CHSI_State_Abbr','No_Exercise','Obesity','High_Blood_Pres','Smoker','Diabetes','Uninsured','Elderly_Medicare','Disabled_Medicare','Prim_Care_Phys_Rate','Dentist_Rate')]
+unlink(temp)
+#adding the age_65_84 column from DEMOGRAPHICS.csv to the risk_factors data frame
+
+risk_factors['age_65_84']<-age_65_84
+
+risk_factors<-risk_factors[,3:13]
+
+corMat<-cor(risk_factors, use = 'pairwise.complete.obs')
+
+correlations<-corMat[1:10,11]
+correlations_w_age_65_84<-as.data.frame(correlations)
+correlations_w_age_65_84['risk_factors']<-row.names(correlations_w_age_65_84)
+correlations_w_age_65_84
+
+require(dplyr)
+
+correlations_w_age_65_84<-arrange(correlations_w_age_65_84,abs(correlations))
+
+dat1<- subset(correlations_w_age_65_84,correlations>=0)
+dat2<- subset(correlations_w_age_65_84, correlations<0)
+
+plot4<- ggplot() + geom_bar(data = dat1, aes(x= risk_factors,y= correlations),fill='blue',stat = 'identity')
+plot4<- plot4 + geom_bar(data = dat2, aes(x= risk_factors, y= correlations),fill='red',stat='identity')
+plot4<-plot4 + ggtitle('Correlations with the rate of Ages between 65 & 84') + labs(x='Risk Factors',y='Correlation with Age_65_85')
+plot4<-plot4 + coord_flip()
+plot4
+```
